@@ -115,7 +115,7 @@ export function Settings() {
             {coach.data?.configured ? (
               <>
                 <p>
-                  Connected. Requests go through the Season API using <span className="num">{coach.data.model}</span>.
+                  Connected. Requests go through the CoachJan API using <span className="num">{coach.data.model}</span>.
                   The key stays on the server and is never sent to the browser.
                 </p>
               </>
@@ -132,7 +132,7 @@ export function Settings() {
         <Panel title="Where your data lives">
           <div className="space-y-2 px-3.5 py-3 text-[13px] leading-relaxed text-ink-2">
             <p>
-              Everything is in a SQLite file on this machine, by default <span className="num text-[12px]">data/season.db</span>.
+              Everything is in a SQLite file on this machine, by default <span className="num text-[12px]">data/coachjan.db</span>.
               Uploaded FIT files are kept alongside it in <span className="num text-[12px]">uploads/</span>, so a ride can be
               re-read later.
             </p>

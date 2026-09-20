@@ -29,5 +29,5 @@ app.use(errorHandler)
 
 const port = Number(process.env.PORT) || 5174
 app.listen(port, () => {
-  console.log(`[season] api listening on http://localhost:${port}`)
+  console.log(`[coachjan] api listening on http://localhost:${port}`)
 })

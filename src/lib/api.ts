@@ -23,7 +23,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
       headers: init?.body instanceof FormData ? init?.headers : { 'Content-Type': 'application/json', ...init?.headers },
     })
   } catch {
-    throw new ApiError('Could not reach the Season API. Is it running? Start it with npm run dev.')
+    throw new ApiError('Could not reach the CoachJan API. Is it running? Start it with npm run dev.')
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()
@@ -153,7 +153,7 @@ export async function streamCoach(
     })
   } catch (error) {
     if ((error as Error).name === 'AbortError') return
-    handlers.onError('Could not reach the Season API. Is it running?')
+    handlers.onError('Could not reach the CoachJan API. Is it running?')
     return
   }
 

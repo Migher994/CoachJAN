@@ -1,4 +1,4 @@
-# Season
+# CoachJan
 
 A local-first training tracker for one road cyclist racing a season. It keeps the
 season's races, the training behind them, and two Claude-backed features: written
@@ -24,7 +24,7 @@ than failing silently.
 
 ## Where the data lives
 
-SQLite, at `data/season.db` by default (override with `DB_PATH`). Uploaded FIT
+SQLite, at `data/coachjan.db` by default (override with `DB_PATH`). Uploaded FIT
 files are kept in `uploads/` so a ride can be re-read later. Both are gitignored.
 Nothing is kept in browser storage, so the database file is the whole system of
 record: back it up and you have backed up everything.

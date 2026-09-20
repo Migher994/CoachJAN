@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
-const dbPath = resolve(process.env.DB_PATH ?? './data/season.db')
+const dbPath = resolve(process.env.DB_PATH ?? './data/coachjan.db')
 mkdirSync(dirname(dbPath), { recursive: true })
 
 export const db = new Database(dbPath)

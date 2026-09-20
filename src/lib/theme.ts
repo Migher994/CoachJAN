@@ -1,6 +1,6 @@
 export type Theme = 'system' | 'light' | 'dark'
 
-const KEY = 'season.theme'
+const KEY = 'coachjan.theme'
 
 export function readTheme(): Theme {
   const stored = localStorage.getItem(KEY)

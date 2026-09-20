@@ -43,7 +43,7 @@ export default function App() {
     <div className="min-h-full">
       <header className="sticky top-0 z-20 border-b border-rule bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-4 py-2.5">
-          <span className="num shrink-0 text-[15px] font-semibold tracking-tight">Season</span>
+          <span className="num shrink-0 text-[15px] font-semibold tracking-tight">CoachJan</span>
           <nav className="-mx-1 flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
             {NAV.map((item) => (
               <NavLink
