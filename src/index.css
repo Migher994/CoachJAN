@@ -1,0 +1,253 @@
+@import "tailwindcss";
+
+/*
+ * Season's visual system. A training log, not a marketing page: flat panels
+ * separated by hairlines, square corners, tabular figures everywhere a number
+ * appears, and one accent colour per screen reserved for the thing that matters.
+ * Chart series colours are the validated categorical slots 1-3.
+ */
+
+:root {
+  color-scheme: light;
+
+  --c-paper:        #eef0f1;
+  --c-surface:      #ffffff;
+  --c-surface-2:    #f7f8f9;
+  --c-surface-3:    #eceef0;
+  --c-rule:         #dcdfe3;
+  --c-rule-strong:  #c3c8cf;
+  --c-ink:          #14171a;
+  --c-ink-2:        #4b535c;
+  --c-ink-3:        #78828d;
+  --c-accent:       #2a78d6;
+  --c-accent-ink:   #1a5aa8;
+  --c-accent-wash:  #e7f0fc;
+  --c-good:         #0ca30c;
+  --c-warning:      #9a6b00;
+  --c-critical:     #c0392f;
+  --c-grid:         #e6e9ec;
+
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s-neutral: #9aa3ad;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+
+    --c-paper:        #0d0f11;
+    --c-surface:      #16181b;
+    --c-surface-2:    #1b1e22;
+    --c-surface-3:    #23272c;
+    --c-rule:         #282d33;
+    --c-rule-strong:  #3a4149;
+    --c-ink:          #e7eaed;
+    --c-ink-2:        #a5aeb8;
+    --c-ink-3:        #78828d;
+    --c-accent:       #3987e5;
+    --c-accent-ink:   #6aa6ee;
+    --c-accent-wash:  #14243a;
+    --c-good:         #35b935;
+    --c-warning:      #d09a4a;
+    --c-critical:     #e26a62;
+    --c-grid:         #23272c;
+
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s-neutral: #6b757f;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --c-paper:        #0d0f11;
+  --c-surface:      #16181b;
+  --c-surface-2:    #1b1e22;
+  --c-surface-3:    #23272c;
+  --c-rule:         #282d33;
+  --c-rule-strong:  #3a4149;
+  --c-ink:          #e7eaed;
+  --c-ink-2:        #a5aeb8;
+  --c-ink-3:        #78828d;
+  --c-accent:       #3987e5;
+  --c-accent-ink:   #6aa6ee;
+  --c-accent-wash:  #14243a;
+  --c-good:         #35b935;
+  --c-warning:      #d09a4a;
+  --c-critical:     #e26a62;
+  --c-grid:         #23272c;
+
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --s-neutral: #6b757f;
+}
+
+@theme inline {
+  --color-paper:       var(--c-paper);
+  --color-surface:     var(--c-surface);
+  --color-surface-2:   var(--c-surface-2);
+  --color-surface-3:   var(--c-surface-3);
+  --color-rule:        var(--c-rule);
+  --color-rule-strong: var(--c-rule-strong);
+  --color-ink:         var(--c-ink);
+  --color-ink-2:       var(--c-ink-2);
+  --color-ink-3:       var(--c-ink-3);
+  --color-accent:      var(--c-accent);
+  --color-accent-ink:  var(--c-accent-ink);
+  --color-accent-wash: var(--c-accent-wash);
+  --color-good:        var(--c-good);
+  --color-warning:     var(--c-warning);
+  --color-critical:    var(--c-critical);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  --radius-panel: 3px;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--c-paper);
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Numbers read as instrument readouts: monospaced, tabular, tight. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+.panel {
+  background: var(--c-surface);
+  border: 1px solid var(--c-rule);
+  border-radius: var(--radius-panel);
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--c-rule);
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.hairline { border-color: var(--c-rule); }
+
+input, select, textarea {
+  background: var(--c-surface);
+  color: var(--c-ink);
+  border: 1px solid var(--c-rule-strong);
+  border-radius: 2px;
+  padding: 6px 8px;
+  font-size: 13px;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="number"] { font-family: var(--font-mono); }
+
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 1px;
+}
+
+input::placeholder, textarea::placeholder { color: var(--c-ink-3); }
+
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--c-rule-strong);
+  border-radius: 2px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--c-surface);
+  color: var(--c-ink);
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--c-surface-2); }
+
+.btn-primary {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) { background: var(--c-accent-ink); border-color: var(--c-accent-ink); }
+
+.btn-danger { color: var(--c-critical); }
+.btn-danger:hover:not(:disabled) { background: var(--c-surface-2); }
+
+.btn-sm { padding: 3px 8px; font-size: 12px; }
+
+/* Data tables: hairline rows, no zebra, numbers right-aligned. */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-ink-3);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--c-rule);
+  white-space: nowrap;
+}
+.tbl td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--c-rule);
+  vertical-align: baseline;
+}
+.tbl tbody tr:last-child td { border-bottom: 0; }
+.tbl tbody tr:hover { background: var(--c-surface-2); }
+.tbl .r { text-align: right; }
+
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 0 6px;
+  border: 1px solid var(--c-rule-strong);
+  border-radius: 2px;
+  color: var(--c-ink-2);
+  white-space: nowrap;
+}
+
+.prose-feedback p { margin-bottom: 0.9em; }
+.prose-feedback p:last-child { margin-bottom: 0; }
+
+/* Recharts chrome pulled back to hairlines. */
+.recharts-cartesian-axis-tick text { fill: var(--c-ink-3); font-size: 11px; }
+.recharts-cartesian-grid line { stroke: var(--c-grid); }
+.recharts-cartesian-axis-line, .recharts-cartesian-axis-tick-line { stroke: var(--c-rule); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Reference tables: let the label column take the slack so the numbers group right. */
+.tbl-tight th:first-child, .tbl-tight td:first-child { width: 100%; }
