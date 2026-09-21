@@ -11,14 +11,14 @@ const today = (): string => isoDay(new Date())
 const daysBetween = (from: string, to: string): number =>
   Math.round((new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) / 86_400_000)
 
-dashboardRouter.get('/', (_req, res) => {
+dashboardRouter.get('/', async (req, res) => {
+  const userId = req.user!.id
   const now = today()
-  const profile = getProfile()
-  const all = listActivities()
-  const upcoming = (db.prepare('SELECT * FROM race WHERE date >= ? ORDER BY date').all(now) as Race[]).map((r) => ({
-    ...r,
-    days_away: daysBetween(now, r.date),
-  }))
+  const profile = await getProfile(userId)
+  const all = await listActivities(userId)
+  const upcoming = (await db.all<Race>('SELECT * FROM race WHERE user_id = ? AND date >= ? ORDER BY date', userId, now)).map(
+    (r) => ({ ...r, days_away: daysBetween(now, r.date) }),
+  )
 
   const pmc = pmcSeries(all.map((a) => ({ date: a.date, tss: a.tss })), now)
   const last = pmc.at(-1) ?? null
@@ -44,21 +44,21 @@ dashboardRouter.get('/', (_req, res) => {
   res.json(summary)
 })
 
-dashboardRouter.get('/pmc', (req, res) => {
+dashboardRouter.get('/pmc', async (req, res) => {
   const days = Number(req.query.days) || 180
-  const all = listActivities()
+  const all = await listActivities(req.user!.id)
   const series = pmcSeries(all.map((a) => ({ date: a.date, tss: a.tss })), today())
   res.json(series.slice(Math.max(0, series.length - days)))
 })
 
-dashboardRouter.get('/weekly', (req, res) => {
+dashboardRouter.get('/weekly', async (req, res) => {
   const weeks = Math.min(52, Math.max(4, Number(req.query.weeks) || 12))
-  res.json(weeklyLoads(listActivities(), weeks, today()))
+  res.json(weeklyLoads(await listActivities(req.user!.id), weeks, today()))
 })
 
-dashboardRouter.get('/power-trend', (req, res) => {
+dashboardRouter.get('/power-trend', async (req, res) => {
   const limit = Math.min(120, Math.max(5, Number(req.query.limit) || 30))
-  const rows = listActivities({ limit })
+  const rows = (await listActivities(req.user!.id, { limit }))
     .filter((a) => a.avg_power != null || a.normalized_power != null)
     .reverse()
     .map((a) => ({
@@ -72,10 +72,11 @@ dashboardRouter.get('/power-trend', (req, res) => {
   res.json(rows)
 })
 
-dashboardRouter.get('/power-curve', (_req, res) => {
+dashboardRouter.get('/power-curve', async (req, res) => {
+  const userId = req.user!.id
   const now = today()
   res.json({
-    current: powerCurve('Last 90 days', daysAgo(89, now), now),
-    previous: powerCurve('Previous 90 days', daysAgo(179, now), daysAgo(90, now)),
+    current: await powerCurve('Last 90 days', daysAgo(89, now), now, userId),
+    previous: await powerCurve('Previous 90 days', daysAgo(179, now), daysAgo(90, now), userId),
   })
 })

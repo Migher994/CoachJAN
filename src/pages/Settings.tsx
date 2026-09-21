@@ -132,11 +132,10 @@ export function Settings() {
         <Panel title="Where your data lives">
           <div className="space-y-2 px-3.5 py-3 text-[13px] leading-relaxed text-ink-2">
             <p>
-              Everything is in a SQLite file on this machine, by default <span className="num text-[12px]">data/coachjan.db</span>.
-              Uploaded FIT files are kept alongside it in <span className="num text-[12px]">uploads/</span>, so a ride can be
-              re-read later.
+              Everything is in Postgres, scoped to your account. Uploaded FIT files are kept in Cloud Storage (or a local
+              <span className="num text-[12px]"> uploads/</span> folder in development), so a ride can be re-read later.
             </p>
-            <p>Nothing leaves the machine except the training summaries the two coach features send to Anthropic.</p>
+            <p>Nothing leaves the server except the training summaries the two coach features send to Anthropic.</p>
           </div>
         </Panel>
       </div>

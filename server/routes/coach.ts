@@ -70,32 +70,31 @@ interface FeedbackContext {
   report: string
 }
 
-function buildFeedbackContext(input: z.infer<typeof feedbackRequest>): FeedbackContext {
+async function buildFeedbackContext(input: z.infer<typeof feedbackRequest>, userId: number): Promise<FeedbackContext> {
   const now = today()
   if (input.scope === 'latest' || input.scope === 'activity') {
     let id = input.activity_id
     if (input.scope === 'latest') {
-      const latest = listActivities({ limit: 1 })[0]
-      if (!latest) badRequest('No activities logged yet, so there is nothing to review. Add a ride first.')
+      const latest = (await listActivities(userId, { limit: 1 }))[0]
+      if (!latest) return badRequest('No activities logged yet, so there is nothing to review. Add a ride first.')
       id = (latest as ActivityRow).id
     }
-    if (!id) badRequest('Pick an activity to review.')
-    const analysis = analyseActivity(id as number)
-    if (!analysis) badRequest('No activity with that id.')
-    const a = analysis!
+    if (!id) return badRequest('Pick an activity to review.')
+    const analysis = await analyseActivity(id, userId)
+    if (!analysis) return badRequest('No activity with that id.')
     return {
       scope: 'activity',
       ref: String(id),
-      label: `${a.activity.name} - ${a.activity.date}`,
-      report: renderActivityReport(a),
+      label: `${analysis.activity.name} - ${analysis.activity.date}`,
+      report: renderActivityReport(analysis),
     }
   }
 
   const days = input.scope === 'last7' ? 7 : 14
   const from = daysAgo(days - 1, now)
-  const block = analyseBlock(from, now)
+  const block = await analyseBlock(from, now, userId)
   if (!block.ride_count) {
-    badRequest(`Nothing logged in the last ${days} days, so there is nothing to review.`)
+    return badRequest(`Nothing logged in the last ${days} days, so there is nothing to review.`)
   }
   return {
     scope: 'block',
@@ -106,9 +105,10 @@ function buildFeedbackContext(input: z.infer<typeof feedbackRequest>): FeedbackC
 }
 
 coachRouter.post('/feedback', async (req, res) => {
+  const userId = req.user!.id
   const input = body(req, feedbackRequest)
-  const profile = getProfile()
-  const ctx = buildFeedbackContext(input)
+  const profile = await getProfile(userId)
+  const ctx = await buildFeedbackContext(input, userId)
 
   const user = [
     "Rider's profile:",
@@ -116,7 +116,10 @@ coachRouter.post('/feedback', async (req, res) => {
     '',
     `Today is ${today()}.`,
     'Upcoming races:',
-    renderRaces(db.prepare('SELECT * FROM race WHERE date >= ? ORDER BY date LIMIT 5').all(today()) as Race[], today()),
+    renderRaces(
+      await db.all<Race>('SELECT * FROM race WHERE user_id = ? AND date >= ? ORDER BY date LIMIT 5', userId, today()),
+      today(),
+    ),
     '',
     ctx.scope === 'activity'
       ? 'Review this ride.'
@@ -165,15 +168,16 @@ const planSchema = z.object({
   ),
 })
 
-function planContext(): string {
+async function planContext(userId: number): Promise<string> {
   const now = today()
-  const profile = getProfile()
-  const recent = listActivities({ limit: 10 })
-  const lastFeedback = db
-    .prepare('SELECT * FROM feedback ORDER BY created_at DESC, id DESC LIMIT 1')
-    .get() as Feedback | undefined
-  const weekly = weeklyLoads(listActivities({ from: daysAgo(27, now) }), 4, now)
-  const races = db.prepare('SELECT * FROM race WHERE date >= ? ORDER BY date LIMIT 8').all(now) as Race[]
+  const profile = await getProfile(userId)
+  const recent = await listActivities(userId, { limit: 10 })
+  const lastFeedback = await db.get<Feedback>(
+    'SELECT * FROM feedback WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+    userId,
+  )
+  const weekly = weeklyLoads(await listActivities(userId, { from: daysAgo(27, now) }), 4, now)
+  const races = await db.all<Race>('SELECT * FROM race WHERE user_id = ? AND date >= ? ORDER BY date LIMIT 8', userId, now)
 
   return [
     `Today is ${now}.`,
@@ -196,18 +200,19 @@ function planContext(): string {
   ].join('\n')
 }
 
-coachRouter.post('/plan', async (_req, res) => {
+coachRouter.post('/plan', async (req, res) => {
+  const userId = req.user!.id
   try {
     const plan = await parseJson({
       schema: planSchema,
       system: PLAN_SYSTEM,
-      user: `${planContext()}\n\nProduce the next block of three or four weeks.`,
+      user: `${await planContext(userId)}\n\nProduce the next block of three or four weeks.`,
     })
     const problems: string[] = []
     if (plan.weeks.length < 3 || plan.weeks.length > 4) {
       problems.push(`The model returned ${plan.weeks.length} weeks rather than three or four.`)
     }
-    const target = getProfile().weekly_hours_target
+    const target = (await getProfile(userId)).weekly_hours_target
     if (target) {
       for (const w of plan.weeks) {
         const planned = w.sessions.reduce((sum, s) => sum + (s.duration_min || 0), 0) / 60
@@ -229,12 +234,13 @@ coachRouter.post('/plan', async (_req, res) => {
 })
 
 coachRouter.post('/ask', async (req, res) => {
+  const userId = req.user!.id
   const { question } = body(req, z.object({ question: z.string().min(3).max(2000) }))
   const send = openStream(res)
   try {
     const text = await streamText({
       system: ASK_SYSTEM,
-      user: `${planContext()}\n\nThe rider asks: ${question}`,
+      user: `${await planContext(userId)}\n\nThe rider asks: ${question}`,
       onDelta: (delta) => send({ type: 'delta', text: delta }),
     })
     send({ type: 'done', text })

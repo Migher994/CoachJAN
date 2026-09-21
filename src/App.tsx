@@ -4,9 +4,11 @@ import { ActivityDetail } from './pages/ActivityDetail'
 import { Dashboard } from './pages/Dashboard'
 import { FeedbackCoach } from './pages/FeedbackCoach'
 import { Log } from './pages/Log'
+import { Login } from './pages/Login'
 import { Planner } from './pages/Planner'
 import { Races } from './pages/Races'
 import { Settings } from './pages/Settings'
+import { useAuth } from './lib/auth'
 import { applyTheme, readTheme, type Theme } from './lib/theme'
 
 const NAV = [
@@ -38,7 +40,34 @@ function ThemeToggle() {
   )
 }
 
+function SignOutButton() {
+  const { logout } = useAuth()
+  const [busy, setBusy] = useState(false)
+  return (
+    <button
+      type="button"
+      className="btn btn-sm"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true)
+        try {
+          await logout()
+        } finally {
+          setBusy(false)
+        }
+      }}
+    >
+      {busy ? 'Signing out…' : 'Sign out'}
+    </button>
+  )
+}
+
 export default function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) return null
+  if (!user) return <Login />
+
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-20 border-b border-rule bg-surface/95 backdrop-blur">
@@ -63,6 +92,7 @@ export default function App() {
             ))}
           </nav>
           <ThemeToggle />
+          <SignOutButton />
         </div>
       </header>
 

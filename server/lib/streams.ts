@@ -26,41 +26,45 @@ const CHANNELS: (keyof StreamData)[] = [
   'second', 'power', 'hr', 'cadence', 'speed', 'altitude', 'distance', 'grade', 'moving',
 ]
 
-export function saveStream(activityId: number, stream: StreamData): void {
+export async function saveStream(activityId: number, userId: number, stream: StreamData): Promise<void> {
   const blob = gzipSync(Buffer.from(JSON.stringify(stream), 'utf8'))
-  db.prepare(
-    `INSERT INTO activity_stream (activity_id, n_points, channels, data, created_at)
-     VALUES (?, ?, ?, ?, ?)
+  await db.run(
+    `INSERT INTO activity_stream (activity_id, user_id, n_points, channels, data, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(activity_id) DO UPDATE SET
        n_points = excluded.n_points,
        channels = excluded.channels,
        data = excluded.data,
        created_at = excluded.created_at`,
-  ).run(activityId, stream.second.length, CHANNELS.join(','), blob, nowIso())
+    activityId, userId, stream.second.length, CHANNELS.join(','), blob, nowIso(),
+  )
 }
 
-export function loadStream(activityId: number): StreamData | null {
-  const row = db
-    .prepare('SELECT data FROM activity_stream WHERE activity_id = ?')
-    .get(activityId) as { data: Buffer } | undefined
+export async function loadStream(activityId: number, userId: number): Promise<StreamData | null> {
+  const row = await db.get<{ data: Buffer }>(
+    'SELECT data FROM activity_stream WHERE activity_id = ? AND user_id = ?',
+    activityId, userId,
+  )
   if (!row) return null
   return JSON.parse(gunzipSync(row.data).toString('utf8')) as StreamData
 }
 
-export function hasStream(activityId: number): boolean {
-  const row = db
-    .prepare('SELECT 1 AS present FROM activity_stream WHERE activity_id = ?')
-    .get(activityId) as { present: number } | undefined
+export async function hasStream(activityId: number, userId: number): Promise<boolean> {
+  const row = await db.get<{ present: number }>(
+    'SELECT 1 AS present FROM activity_stream WHERE activity_id = ? AND user_id = ?',
+    activityId, userId,
+  )
   return Boolean(row)
 }
 
-export function activityIdsWithStreams(): number[] {
-  const rows = db
-    .prepare('SELECT activity_id FROM activity_stream ORDER BY activity_id')
-    .all() as { activity_id: number }[]
+export async function activityIdsWithStreams(userId: number): Promise<number[]> {
+  const rows = await db.all<{ activity_id: number }>(
+    'SELECT activity_id FROM activity_stream WHERE user_id = ? ORDER BY activity_id',
+    userId,
+  )
   return rows.map((r) => r.activity_id)
 }
 
-export function deleteStream(activityId: number): void {
-  db.prepare('DELETE FROM activity_stream WHERE activity_id = ?').run(activityId)
+export async function deleteStream(activityId: number, userId: number): Promise<void> {
+  await db.run('DELETE FROM activity_stream WHERE activity_id = ? AND user_id = ?', activityId, userId)
 }

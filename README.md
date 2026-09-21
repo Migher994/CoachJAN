@@ -1,33 +1,61 @@
 # CoachJan
 
-A local-first training tracker for one road cyclist racing a season. It keeps the
-season's races, the training behind them, and two Claude-backed features: written
-feedback on recent work, and a generated training block for the weeks ahead.
+A training tracker for a small closed group of road cyclists racing a season.
+It keeps each rider's races, the training behind them, and two Claude-backed
+features: written feedback on recent work, and a generated training block for
+the weeks ahead.
 
-Single user, runs on your own machine. Nothing leaves it except the training
-summaries the two coach features send to Anthropic.
+Each person signs in to their own account; there is no public signup, and one
+rider can never see another's data. Nothing leaves the server except the
+training summaries the two coach features send to Anthropic, and login
+requests never leave the server at all.
 
 ## Running it
 
+You need a Postgres database. The quickest way to get one locally is Docker:
+
+```shell
+docker run -d --name coachjan-db \
+  -e POSTGRES_USER=coachjan -e POSTGRES_PASSWORD=coachjan -e POSTGRES_DB=coachjan \
+  -p 5432:5432 postgres:16
+```
+
+Then:
+
 ```shell
 npm install
-cp .env.example .env     # add ANTHROPIC_API_KEY for the coach features
+cp .env.example .env     # DATABASE_URL for the Postgres above, JWT_SECRET, ANTHROPIC_API_KEY
 npm run dev
 ```
 
 `npm run dev` starts both halves: the Express API on port 5174 and the Vite client
-on port 5173. Open http://localhost:5173.
+on port 5173. Open http://localhost:5173. The API creates its own tables on
+first start, so there is nothing to migrate by hand.
+
+There is no signup page - create each account yourself:
+
+```shell
+npm run create-user -- you@example.com a-strong-password "Your Name"
+```
+
+Running it again for the same email resets that person's password rather than
+creating a duplicate account.
 
 The two coach features and the paste parser need `ANTHROPIC_API_KEY`. Everything
 else works without it, and the UI says so where a feature is unavailable rather
 than failing silently.
 
+To deploy this to Google Cloud Run, see [DEPLOY.md](./DEPLOY.md).
+
 ## Where the data lives
 
-SQLite, at `data/coachjan.db` by default (override with `DB_PATH`). Uploaded FIT
-files are kept in `uploads/` so a ride can be re-read later. Both are gitignored.
-Nothing is kept in browser storage, so the database file is the whole system of
-record: back it up and you have backed up everything.
+Postgres, one set of rows per user, scoped by `user_id` on every table. Nothing
+is kept in browser storage, so the database is the whole system of record for
+the season's training: back it up and you have backed up everything.
+
+Uploaded FIT files are kept separately so a ride can be re-read later: in a
+Google Cloud Storage bucket when `GCS_BUCKET` is set, otherwise under `uploads/`
+on disk, which is what `npm run dev` uses with no cloud setup at all.
 
 ## What is in it
 
@@ -87,15 +115,19 @@ what is missing. No chart is filled with invented data.
 
 ```
 server/         Express API
-  db.ts         SQLite schema and connection
+  db.ts         Postgres schema, migrate() and the query compatibility layer
+  scripts/
+    create-user.ts  creates or resets one account; no signup endpoint exists
   lib/
+    auth.ts     password hashing, session cookies, attachUser/requireAuth
+    storage.ts  FIT file storage: Cloud Storage in production, uploads/ in dev
     metrics.ts  the maths: load, rolling means, NP, decoupling, climbs, gearing
     analysis.ts assembles stored rows and stream maths into API shapes
     streams.ts  gzipped 1 Hz stream storage
     fit.ts      FIT decoding and resampling
     claude.ts   the only place the Anthropic SDK is called
     prompts.ts  prompt construction and the rendered metric reports
-  routes/       one router per area
+  routes/       one router per area, each requiring auth except routes/auth.ts
 src/            React client
 shared/types.ts types used by both halves
 ```

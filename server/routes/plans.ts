@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { db, nowIso } from '../db.js'
+import { db, nowIso, withTransaction } from '../db.js'
 import type { Plan, PlanWeek } from '../../shared/types.js'
 import { body, intParam, notFound } from '../lib/http.js'
 
@@ -17,8 +17,8 @@ const hydrate = (row: PlanRow): Plan => ({
   active: Boolean(row.active),
 })
 
-plansRouter.get('/', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM plan ORDER BY created_at DESC, id DESC').all() as PlanRow[]
+plansRouter.get('/', async (req, res) => {
+  const rows = await db.all<PlanRow>('SELECT * FROM plan WHERE user_id = ? ORDER BY created_at DESC, id DESC', req.user!.id)
   res.json(rows.map(hydrate))
 })
 
@@ -43,27 +43,30 @@ const planSchema = z.object({
   ),
 })
 
-plansRouter.post('/', (req, res) => {
+plansRouter.post('/', async (req, res) => {
+  const userId = req.user!.id
   const d = body(req, planSchema)
-  const info = db
-    .prepare('INSERT INTO plan (name, focus, weeks, created_at, active) VALUES (?, ?, ?, ?, 0)')
-    .run(d.name, d.focus, JSON.stringify(d.weeks), nowIso())
-  res.status(201).json(hydrate(db.prepare('SELECT * FROM plan WHERE id = ?').get(info.lastInsertRowid) as PlanRow))
+  const info = await db.run(
+    'INSERT INTO plan (user_id, name, focus, weeks, created_at, active) VALUES (?, ?, ?, ?, ?, 0) RETURNING id',
+    userId, d.name, d.focus, JSON.stringify(d.weeks), nowIso(),
+  )
+  res.status(201).json(hydrate((await db.get<PlanRow>('SELECT * FROM plan WHERE id = ?', info.lastInsertRowid)) as PlanRow))
 })
 
-plansRouter.put('/:id/activate', (req, res) => {
+plansRouter.put('/:id/activate', async (req, res) => {
+  const userId = req.user!.id
   const id = intParam(req, 'id')
-  const exists = db.prepare('SELECT 1 FROM plan WHERE id = ?').get(id)
-  if (!exists) notFound('No plan with that id.')
-  db.transaction(() => {
-    db.prepare('UPDATE plan SET active = 0').run()
-    db.prepare('UPDATE plan SET active = 1 WHERE id = ?').run(id)
-  })()
-  res.json(hydrate(db.prepare('SELECT * FROM plan WHERE id = ?').get(id) as PlanRow))
+  const exists = await db.get('SELECT 1 FROM plan WHERE id = ? AND user_id = ?', id, userId)
+  if (!exists) return notFound('No plan with that id.')
+  await withTransaction(async (trx) => {
+    await trx.run('UPDATE plan SET active = 0 WHERE user_id = ?', userId)
+    await trx.run('UPDATE plan SET active = 1 WHERE id = ? AND user_id = ?', id, userId)
+  })
+  res.json(hydrate((await db.get<PlanRow>('SELECT * FROM plan WHERE id = ?', id)) as PlanRow))
 })
 
-plansRouter.delete('/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM plan WHERE id = ?').run(intParam(req, 'id'))
-  if (!info.changes) notFound('No plan with that id.')
+plansRouter.delete('/:id', async (req, res) => {
+  const info = await db.run('DELETE FROM plan WHERE id = ? AND user_id = ?', intParam(req, 'id'), req.user!.id)
+  if (!info.changes) return notFound('No plan with that id.')
   res.status(204).end()
 })

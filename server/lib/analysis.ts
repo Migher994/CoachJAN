@@ -1,5 +1,5 @@
 /** Assembles stored rows plus stream maths into the shapes the UI and the prompts use. */
-import { db } from '../db.js'
+import { db, nowIso } from '../db.js'
 import type {
   Activity,
   ActivityAnalysis,
@@ -29,30 +29,38 @@ import {
 } from './metrics.js'
 import { hasStream, loadStream } from './streams.js'
 
-export function getProfile(): Profile {
-  return db.prepare('SELECT * FROM profile WHERE id = 1').get() as Profile
+/** Lazily creates the profile row if this user doesn't have one yet. */
+export async function getProfile(userId: number): Promise<Profile> {
+  await db.run(
+    'INSERT INTO profile (user_id, updated_at) VALUES (?, ?) ON CONFLICT (user_id) DO NOTHING',
+    userId, nowIso(),
+  )
+  return (await db.get<Profile>('SELECT * FROM profile WHERE user_id = ?', userId)) as Profile
 }
 
-export function getActivity(id: number): Activity | null {
-  return (db.prepare('SELECT * FROM activity WHERE id = ?').get(id) as Activity | undefined) ?? null
+export async function getActivity(id: number, userId: number): Promise<Activity | null> {
+  return (await db.get<Activity>('SELECT * FROM activity WHERE id = ? AND user_id = ?', id, userId)) ?? null
 }
 
 /** Attach load, intensity and stream presence to a stored activity. */
-export function decorate(a: Activity, ftp: number | null): ActivityRow {
+export async function decorate(a: Activity, ftp: number | null, userId: number): Promise<ActivityRow> {
   const load = computeLoad(a, ftp)
   return {
     ...a,
     tss: load.tss,
     tss_basis: load.basis,
     intensity_factor: load.intensity_factor,
-    has_streams: hasStream(a.id),
+    has_streams: await hasStream(a.id, userId),
   }
 }
 
-export function listActivities(opts: { from?: string; to?: string; limit?: number } = {}): ActivityRow[] {
-  const ftp = getProfile().ftp
-  const clauses: string[] = []
-  const params: unknown[] = []
+export async function listActivities(
+  userId: number,
+  opts: { from?: string; to?: string; limit?: number } = {},
+): Promise<ActivityRow[]> {
+  const profile = await getProfile(userId)
+  const clauses: string[] = ['user_id = ?']
+  const params: unknown[] = [userId]
   if (opts.from) {
     clauses.push('date >= ?')
     params.push(opts.from)
@@ -61,13 +69,14 @@ export function listActivities(opts: { from?: string; to?: string; limit?: numbe
     clauses.push('date <= ?')
     params.push(opts.to)
   }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  const where = `WHERE ${clauses.join(' AND ')}`
   const limit = opts.limit ? 'LIMIT ?' : ''
   if (opts.limit) params.push(opts.limit)
-  const rows = db
-    .prepare(`SELECT * FROM activity ${where} ORDER BY date DESC, id DESC ${limit}`)
-    .all(...params) as Activity[]
-  return rows.map((a) => decorate(a, ftp))
+  const rows = await db.all<Activity>(
+    `SELECT * FROM activity ${where} ORDER BY date DESC, id DESC ${limit}`,
+    ...params,
+  )
+  return Promise.all(rows.map((a) => decorate(a, profile.ftp, userId)))
 }
 
 const FUEL_KJ_PER_G_CARB = 4 * 4.184
@@ -95,12 +104,12 @@ function fuelling(a: Activity, streamKjValue: number | null): Fuelling {
 }
 
 /** Everything the feedback prompt needs about one ride. */
-export function analyseActivity(id: number): ActivityAnalysis | null {
-  const activity = getActivity(id)
+export async function analyseActivity(id: number, userId: number): Promise<ActivityAnalysis | null> {
+  const activity = await getActivity(id, userId)
   if (!activity) return null
-  const profile = getProfile()
-  const row = decorate(activity, profile.ftp)
-  const stream = loadStream(id)
+  const profile = await getProfile(userId)
+  const row = await decorate(activity, profile.ftp, userId)
+  const stream = await loadStream(id, userId)
   const gaps: string[] = []
 
   if (!profile.ftp) gaps.push('No FTP set, so TSS and intensity factor could not be computed.')
@@ -159,10 +168,9 @@ export function analyseActivity(id: number): ActivityAnalysis | null {
   }
 }
 
-export function analyseBlock(from: string, to: string): BlockAnalysis {
-  const rows = listActivities({ from, to })
-  const analyses = rows
-    .map((r) => analyseActivity(r.id))
+export async function analyseBlock(from: string, to: string, userId: number): Promise<BlockAnalysis> {
+  const rows = await listActivities(userId, { from, to })
+  const analyses = (await Promise.all(rows.map((r) => analyseActivity(r.id, userId))))
     .filter((a): a is ActivityAnalysis => a != null)
     .reverse()
 
@@ -197,19 +205,18 @@ export function analyseBlock(from: string, to: string): BlockAnalysis {
  * window. Durations longer than the longest ride are simply absent - the curve
  * stops where the data stops rather than being extrapolated.
  */
-export function powerCurve(label: string, from: string, to: string): PowerCurve {
-  const ids = db
-    .prepare(
-      `SELECT a.id, a.date FROM activity a
-       JOIN activity_stream s ON s.activity_id = a.id
-       WHERE a.date >= ? AND a.date <= ?
-       ORDER BY a.date`,
-    )
-    .all(from, to) as { id: number; date: string }[]
+export async function powerCurve(label: string, from: string, to: string, userId: number): Promise<PowerCurve> {
+  const ids = await db.all<{ id: number; date: string }>(
+    `SELECT a.id, a.date FROM activity a
+     JOIN activity_stream s ON s.activity_id = a.id
+     WHERE a.user_id = ? AND a.date >= ? AND a.date <= ?
+     ORDER BY a.date`,
+    userId, from, to,
+  )
 
   const best = new Map<number, PowerCurvePoint>()
   for (const { id, date } of ids) {
-    const stream = loadStream(id)
+    const stream = await loadStream(id, userId)
     if (!stream) continue
     for (const seconds of CURVE_DURATIONS) {
       const watts = bestEffort(stream.power, seconds)

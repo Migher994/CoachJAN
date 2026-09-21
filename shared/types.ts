@@ -12,8 +12,15 @@ export type ActivitySource = 'manual' | 'pasted' | 'fit'
 
 export type RacePriority = 'A' | 'B' | 'C'
 
+export interface User {
+  id: number
+  email: string
+  name: string | null
+  created_at: string
+}
+
 export interface Profile {
-  id: 1
+  user_id: number
   ftp: number | null
   weight_kg: number | null
   weekly_hours_target: number | null

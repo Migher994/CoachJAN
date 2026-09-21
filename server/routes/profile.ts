@@ -14,15 +14,18 @@ const profileSchema = z.object({
   notes: z.string().max(4000).nullable(),
 })
 
-profileRouter.get('/', (_req, res) => {
-  res.json(getProfile())
+profileRouter.get('/', async (req, res) => {
+  res.json(await getProfile(req.user!.id))
 })
 
-profileRouter.put('/', (req, res) => {
+profileRouter.put('/', async (req, res) => {
+  const userId = req.user!.id
   const data = body(req, profileSchema)
-  db.prepare(
+  await getProfile(userId)
+  await db.run(
     `UPDATE profile SET ftp = ?, weight_kg = ?, weekly_hours_target = ?, max_hr = ?, notes = ?, updated_at = ?
-     WHERE id = 1`,
-  ).run(data.ftp, data.weight_kg, data.weekly_hours_target, data.max_hr, data.notes, nowIso())
-  res.json(getProfile())
+     WHERE user_id = ?`,
+    data.ftp, data.weight_kg, data.weekly_hours_target, data.max_hr, data.notes, nowIso(), userId,
+  )
+  res.json(await getProfile(userId))
 })

@@ -14,36 +14,37 @@ const raceSchema = z.object({
   result_notes: z.string().max(4000).nullable(),
 })
 
-racesRouter.get('/', (_req, res) => {
-  res.json(db.prepare('SELECT * FROM race ORDER BY date').all() as Race[])
+racesRouter.get('/', async (req, res) => {
+  res.json(await db.all<Race>('SELECT * FROM race WHERE user_id = ? ORDER BY date', req.user!.id))
 })
 
-racesRouter.post('/', (req, res) => {
+racesRouter.post('/', async (req, res) => {
+  const userId = req.user!.id
   const d = body(req, raceSchema)
-  const info = db
-    .prepare(
-      `INSERT INTO race (name, date, priority, course_notes, result_notes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .run(d.name, d.date, d.priority, d.course_notes, d.result_notes, nowIso())
-  res.status(201).json(db.prepare('SELECT * FROM race WHERE id = ?').get(info.lastInsertRowid))
+  const info = await db.run(
+    `INSERT INTO race (user_id, name, date, priority, course_notes, result_notes, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+    userId, d.name, d.date, d.priority, d.course_notes, d.result_notes, nowIso(),
+  )
+  res.status(201).json(await db.get<Race>('SELECT * FROM race WHERE id = ?', info.lastInsertRowid))
 })
 
-racesRouter.put('/:id', (req, res) => {
+racesRouter.put('/:id', async (req, res) => {
+  const userId = req.user!.id
   const id = intParam(req, 'id')
   const d = body(req, raceSchema)
-  const info = db
-    .prepare(
-      'UPDATE race SET name = ?, date = ?, priority = ?, course_notes = ?, result_notes = ? WHERE id = ?',
-    )
-    .run(d.name, d.date, d.priority, d.course_notes, d.result_notes, id)
-  if (!info.changes) notFound('No race with that id.')
-  res.json(db.prepare('SELECT * FROM race WHERE id = ?').get(id))
+  const info = await db.run(
+    'UPDATE race SET name = ?, date = ?, priority = ?, course_notes = ?, result_notes = ? WHERE id = ? AND user_id = ?',
+    d.name, d.date, d.priority, d.course_notes, d.result_notes, id, userId,
+  )
+  if (!info.changes) return notFound('No race with that id.')
+  res.json(await db.get<Race>('SELECT * FROM race WHERE id = ?', id))
 })
 
-racesRouter.delete('/:id', (req, res) => {
+racesRouter.delete('/:id', async (req, res) => {
+  const userId = req.user!.id
   const id = intParam(req, 'id')
-  const info = db.prepare('DELETE FROM race WHERE id = ?').run(id)
-  if (!info.changes) notFound('No race with that id.')
+  const info = await db.run('DELETE FROM race WHERE id = ? AND user_id = ?', id, userId)
+  if (!info.changes) return notFound('No race with that id.')
   res.status(204).end()
 })

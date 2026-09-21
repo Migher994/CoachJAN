@@ -10,10 +10,22 @@ import type {
   PowerCurve,
   Profile,
   Race,
+  User,
   WeeklyLoad,
 } from '../../shared/types'
 
 export class ApiError extends Error {}
+
+/**
+ * The app registers one handler here so an expired session anywhere - any
+ * request, at any time - drops the whole app back to the login screen rather
+ * than each call site handling 401 on its own.
+ */
+let unauthorizedHandler: (() => void) | null = null
+
+export function onUnauthorized(handler: () => void): void {
+  unauthorizedHandler = handler
+}
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
@@ -25,6 +37,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new ApiError('Could not reach the CoachJan API. Is it running? Start it with npm run dev.')
   }
+  if (res.status === 401 && path !== '/auth/me') unauthorizedHandler?.()
   if (res.status === 204) return undefined as T
   const text = await res.text()
   let data: unknown = null
@@ -64,9 +77,14 @@ export interface PastedActivity extends Partial<ActivityInput> {
 }
 
 export const api = {
+  auth: {
+    me: () => get<User>('/auth/me'),
+    login: (email: string, password: string) => post<User>('/auth/login', { email, password }),
+    logout: () => post<void>('/auth/logout'),
+  },
   profile: {
     get: () => get<Profile>('/profile'),
-    save: (p: Omit<Profile, 'id' | 'updated_at'>) => put<Profile>('/profile', p),
+    save: (p: Omit<Profile, 'user_id' | 'updated_at'>) => put<Profile>('/profile', p),
   },
   races: {
     list: () => get<Race[]>('/races'),

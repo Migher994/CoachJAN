@@ -1,33 +1,59 @@
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import 'dotenv/config'
+import cookieParser from 'cookie-parser'
 import express from 'express'
+import { migrate } from './db.js'
+import { attachUser, requireAuth } from './lib/auth.js'
 import { errorHandler } from './lib/http.js'
 import { activitiesRouter } from './routes/activities.js'
+import { authRouter } from './routes/auth.js'
 import { coachRouter } from './routes/coach.js'
 import { dashboardRouter } from './routes/dashboard.js'
 import { feedbackRouter } from './routes/feedback.js'
 import { plansRouter } from './routes/plans.js'
 import { profileRouter } from './routes/profile.js'
 import { racesRouter } from './routes/races.js'
-import './db.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 app.use(express.json({ limit: '2mb' }))
+app.use(cookieParser())
+app.use(attachUser)
 
-app.use('/api/profile', profileRouter)
-app.use('/api/races', racesRouter)
-app.use('/api/activities', activitiesRouter)
-app.use('/api/dashboard', dashboardRouter)
-app.use('/api/feedback', feedbackRouter)
-app.use('/api/plans', plansRouter)
-app.use('/api/coach', coachRouter)
+app.use('/api/auth', authRouter)
+app.use('/api/profile', requireAuth, profileRouter)
+app.use('/api/races', requireAuth, racesRouter)
+app.use('/api/activities', requireAuth, activitiesRouter)
+app.use('/api/dashboard', requireAuth, dashboardRouter)
+app.use('/api/feedback', requireAuth, feedbackRouter)
+app.use('/api/plans', requireAuth, plansRouter)
+app.use('/api/coach', requireAuth, coachRouter)
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'No such endpoint.' })
 })
 
+if (process.env.NODE_ENV === 'production') {
+  const distDir = resolve(__dirname, '../dist')
+  app.use(express.static(distDir))
+  app.get(/^\/(?!api\/).*/, (_req, res) => {
+    res.sendFile(resolve(distDir, 'index.html'))
+  })
+}
+
 app.use(errorHandler)
 
-const port = Number(process.env.PORT) || 5174
-app.listen(port, () => {
-  console.log(`[coachjan] api listening on http://localhost:${port}`)
+async function main(): Promise<void> {
+  await migrate()
+  const port = Number(process.env.PORT) || 5174
+  app.listen(port, () => {
+    console.log(`[coachjan] api listening on http://localhost:${port}`)
+  })
+}
+
+main().catch((error) => {
+  console.error('[coachjan] failed to start:', error)
+  process.exit(1)
 })
