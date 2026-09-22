@@ -46,11 +46,15 @@ if (process.env.NODE_ENV === 'production') {
 app.use(errorHandler)
 
 async function main(): Promise<void> {
-  await migrate()
   const port = Number(process.env.PORT) || 5174
-  app.listen(port, () => {
-    console.log(`[coachjan] api listening on http://localhost:${port}`)
+  // Bind before running migrations, so Cloud Run's health check sees the port
+  // open immediately - a slow or failing database shows up as a clear error
+  // in the logs afterward instead of a startup-timeout with no explanation.
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`[coachjan] api listening on http://0.0.0.0:${port}`)
   })
+  await migrate()
+  console.log('[coachjan] database migration complete')
 }
 
 main().catch((error) => {

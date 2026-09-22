@@ -4,6 +4,10 @@ import { Pool, type QueryResultRow } from 'pg'
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  // A bad DATABASE_URL (wrong Cloud SQL socket, missing --add-cloudsql-instances,
+  // a stray newline in the secret) should fail fast and loudly on startup rather
+  // than hang until Cloud Run's own health-check timeout gives up.
+  connectionTimeoutMillis: 10_000,
 })
 
 /** Turns `?` placeholders into Postgres's `$1, $2, ...`. */
