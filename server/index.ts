@@ -48,13 +48,21 @@ app.use(errorHandler)
 async function main(): Promise<void> {
   const port = Number(process.env.PORT) || 5174
   // Bind before running migrations, so Cloud Run's health check sees the port
-  // open immediately - a slow or failing database shows up as a clear error
-  // in the logs afterward instead of a startup-timeout with no explanation.
+  // open immediately - a slow database shows up as a clear error in the logs
+  // afterward instead of a startup-timeout with no explanation.
   app.listen(port, '0.0.0.0', () => {
     console.log(`[coachjan] api listening on http://0.0.0.0:${port}`)
   })
-  await migrate()
-  console.log('[coachjan] database migration complete')
+  try {
+    await migrate()
+    console.log('[coachjan] database migration complete')
+  } catch (error) {
+    // Do not exit here: the process already has the port open and Cloud Run is
+    // routing traffic to it. Exiting now would crash-loop the whole container
+    // (killing even static asset requests) every time the database is briefly
+    // unreachable, instead of surfacing one clear, retryable error.
+    console.error('[coachjan] database migration failed - requests that touch the database will fail until this is fixed:', error)
+  }
 }
 
 main().catch((error) => {
