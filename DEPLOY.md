@@ -34,8 +34,13 @@ gcloud services enable \
 
 ## 2. Create the Cloud SQL Postgres instance, database and user
 
+Newer projects default to Cloud SQL's Enterprise Plus edition, which drops the
+cheap shared-core `db-f1-micro` tier - `--edition=ENTERPRISE` below opts back
+into the classic tier structure so this stays on the cheapest machine size.
+
 ```shell
 gcloud sql instances create "$INSTANCE_NAME" \
+  --edition=ENTERPRISE \
   --database-version=POSTGRES_16 \
   --tier=db-f1-micro \
   --region="$REGION" \
