@@ -156,7 +156,7 @@ same image you just deployed:
 gcloud run jobs create coachjan-create-user \
   --image="gcr.io/${PROJECT_ID}/${SERVICE_NAME}" \
   --region="$REGION" \
-  --add-cloudsql-instances="$CONNECTION_NAME" \
+  --set-cloudsql-instances="$CONNECTION_NAME" \
   --set-secrets="JWT_SECRET=coachjan-jwt-secret:latest,DATABASE_URL=coachjan-database-url:latest" \
   --command="npm" \
   --args="run,create-user,--" \
